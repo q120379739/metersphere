@@ -1,16 +1,23 @@
 package io.metersphere.plan.controller;
 
-import io.metersphere.plan.domain.TestPlanReport;
+import io.metersphere.plan.domain.*;
 import io.metersphere.plan.dto.TestPlanShareInfo;
 import io.metersphere.plan.dto.request.*;
 import io.metersphere.plan.dto.response.TestPlanReportPageResponse;
+import io.metersphere.plan.mapper.TestPlanReportBugMapper;
+import io.metersphere.plan.mapper.TestPlanReportFunctionCaseMapper;
+import io.metersphere.plan.mapper.TestPlanReportMapper;
+import io.metersphere.plan.mapper.TestPlanReportSummaryMapper;
+import io.metersphere.plan.service.TestPlanReportService;
 import io.metersphere.sdk.constants.ShareInfoType;
 import io.metersphere.sdk.util.JSON;
 import io.metersphere.system.base.BaseTest;
 import io.metersphere.system.controller.handler.ResultHolder;
 import io.metersphere.system.utils.Pager;
+import jakarta.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.jdbc.Sql;
@@ -40,6 +47,10 @@ public class TestPlanReportControllerTests extends BaseTest {
     private static final String GEN_AND_SHARE = "/test-plan/report/share/gen";
     private static final String GET_SHARE_INFO = "/test-plan/report/share/get";
     private static final String GET_SHARE_TIME = "/test-plan/report/share/get-share-time";
+    @Autowired
+    private TestPlanReportMapper testPlanReportMapper;
+    @Resource
+    private TestPlanReportService testPlanReportService;
 
     private static String GEN_REPORT_ID;
 
@@ -226,5 +237,36 @@ public class TestPlanReportControllerTests extends BaseTest {
         this.requestPostWithOk(GET_PLAN_REPORT_DETAIL_FUNCTIONAL_PAGE, request);
         request.setSort(Map.of("num", "asc"));
         this.requestPostWithOk(GET_PLAN_REPORT_DETAIL_FUNCTIONAL_PAGE, request);
+    }
+
+    @Resource
+    private TestPlanReportSummaryMapper testPlanReportSummaryMapper;
+    @Resource
+    private TestPlanReportBugMapper testPlanReportBugMapper;
+    @Resource
+    private TestPlanReportFunctionCaseMapper testPlanReportFunctionCaseMapper;
+
+    @Test
+    @Order(99)
+    void cleanReport() throws Exception {
+        TestPlanReportExample reportExample = new TestPlanReportExample();
+        reportExample.createCriteria().andProjectIdEqualTo("100001100001");
+        List<TestPlanReport> reports = testPlanReportMapper.selectByExample(reportExample);
+        List<String> testPlanReportIdList = reports.stream().map(TestPlanReport::getId).toList();
+
+        testPlanReportService.cleanAndDeleteReport(testPlanReportIdList);
+
+        TestPlanReportSummaryExample summaryExample = new TestPlanReportSummaryExample();
+        summaryExample.createCriteria().andTestPlanReportIdIn(testPlanReportIdList);
+
+        TestPlanReportFunctionCaseExample testPlanReportFunctionCaseExample = new TestPlanReportFunctionCaseExample();
+        testPlanReportFunctionCaseExample.createCriteria().andTestPlanReportIdIn(testPlanReportIdList);
+
+        TestPlanReportBugExample testPlanReportBugExample = new TestPlanReportBugExample();
+        testPlanReportBugExample.createCriteria().andTestPlanReportIdIn(testPlanReportIdList);
+
+        Assertions.assertEquals(testPlanReportSummaryMapper.countByExample(summaryExample), 0);
+        Assertions.assertEquals(testPlanReportFunctionCaseMapper.countByExample(testPlanReportFunctionCaseExample), 0);
+        Assertions.assertEquals(testPlanReportBugMapper.countByExample(testPlanReportBugExample), 0);
     }
 }
